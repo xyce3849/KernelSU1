@@ -27,6 +27,11 @@ on:
         required: false
         default: ''
         type: string
+      commit_count:
+        description: 'KernelSU git commit count (version = 30000 + this), passed from caller'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   build-kernelsu-ko:
@@ -39,28 +44,16 @@ jobs:
     steps:
     - name: Checkout source code
       uses: actions/checkout@v7
-      # 必须拉全量历史：Kbuild 用 `git rev-list --count HEAD` 算版本，
-      # 浅克隆(fetch-depth:1) 只会得到 1，导致内核上报版本错误。
-      with:
-        fetch-depth: 0
-
-    - name: Compute KernelSU commit count
-      # 在 checkout 所在的工作区直接算提交数，写入 GITHUB_ENV。
-      # 这一步在容器里执行，只要 ddk-min 镜像带 git 即可（fetch-depth:0 已保证历史完整）。
-      # 数值与管理器 APK 的 versionCode（30000 + 提交数）同源，两边永远一致。
-      id: ksuver
-      run: |
-        git config --global --add safe.directory "${{ github.workspace }}"
-        echo "commit_count=$(git -C "${{ github.workspace }}" rev-list --count HEAD)" >> "$GITHUB_ENV"
 
     - name: Build kernelsu.ko
       env:
         PACKAGE_NAME: ${{ inputs.package_name }}
         EXPECTED_SIZE: ${{ inputs.expected_size }}
         EXPECTED_HASH: ${{ inputs.expected_hash }}
-        # 把提交数喂给 Kbuild，Kbuild 会优先用它算版本（KSU_COMMIT_COUNT），
-        # 即使容器内/构建目录无法 git 检测也能拿到正确版本。
-        KSU_COMMIT_COUNT: ${{ env.commit_count }}
+        # 由上层 workflow 在宿主机算好的"提交数"纯数字，直接传给 Kbuild。
+        # 这样容器内即使没有 git / 没有 .git，也能算出正确版本（30000 + 提交数）。
+        # 留空时 Kbuild 会回退到自身的 git 检测逻辑。
+        KSU_COMMIT_COUNT: ${{ inputs.commit_count }}
       run: |
         git config --global --add safe.directory /__w/KernelSU/KernelSU
 
@@ -110,7 +103,7 @@ jobs:
         PACKAGE_NAME: ${{ inputs.package_name }}
         EXPECTED_SIZE: ${{ inputs.expected_size }}
         EXPECTED_HASH: ${{ inputs.expected_hash }}
-        KSU_COMMIT_COUNT: ${{ env.commit_count }}
+        KSU_COMMIT_COUNT: ${{ inputs.commit_count }}
       run: |
         cd kernel
         make clean
