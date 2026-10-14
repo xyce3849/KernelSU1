@@ -17,6 +17,11 @@ on:
         required: false
         default: ''
         type: string
+      commit_count:
+        description: 'KernelSU git commit count (version = 30000 + this)'
+        required: false
+        default: ''
+        type: string
   workflow_dispatch:
 jobs:
   build-lkm:
@@ -37,3 +42,4 @@ jobs:
       package_name: ${{ inputs.package_name || '' }}
       expected_size: ${{ inputs.expected_size || '' }}
       expected_hash: ${{ inputs.expected_hash || '' }}
+      commit_count: ${{ inputs.commit_count || '' }}
